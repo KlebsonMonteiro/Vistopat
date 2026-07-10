@@ -146,7 +146,7 @@ if "detections_count" not in st.session_state:
 
 # --- TELA 1: FORMULÁRIO DE INSPEÇÃO ---
 if st.session_state.page == "formulario":
-    st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat </div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat IA </div>', unsafe_allow_html=True)
     st.markdown('<div class="main-title">Nova Inspeção</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle">Anexe a imagem para análise.</div>', unsafe_allow_html=True)
 
