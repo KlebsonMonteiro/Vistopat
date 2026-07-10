@@ -3,3 +3,4 @@ ultralytics
 pillow
 reportlab
 numpy
+opencv-python-headless
