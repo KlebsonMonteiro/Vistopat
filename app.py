@@ -1,6 +1,5 @@
 from collections import Counter
 import io
-import time
 import numpy as np
 import streamlit as st
 from PIL import Image
@@ -23,36 +22,45 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stApp { background-color: #f8f9fa !important; color: #212529 !important; }
-    .stApp p, .stApp label, .stApp span, .stApp h1, .stApp h2, .stApp h3 { color: #212529 !important; }
+    /* Paleta com contraste reforçado (mínimo AA ~4.5:1 em todo texto) */
+    .stApp { background-color: #f4f6f8 !important; color: #14181f !important; }
+    .stApp p, .stApp label, .stApp span, .stApp h1, .stApp h2, .stApp h3, .stApp li { color: #14181f !important; }
     .block-container { padding-top: 2rem; padding-bottom: 5rem; }
     .top-header {
-        background-color: #1a365d; padding: 15px; border-radius: 6px;
-        margin-bottom: 25px; color: white !important; font-weight: bold;
+        background-color: #12233f; padding: 15px; border-radius: 6px;
+        margin-bottom: 25px; color: #ffffff !important; font-weight: bold;
         font-size: 24px; display: flex; align-items: center;
-        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.15);
     }
-    .main-title { font-size: 28px; font-weight: bold; color: #1a365d !important; margin-bottom: 5px; }
-    .subtitle { font-size: 14px; color: #555555 !important; margin-bottom: 25px; }
+    .main-title { font-size: 28px; font-weight: bold; color: #12233f !important; margin-bottom: 5px; }
+    .subtitle { font-size: 14px; color: #33404f !important; margin-bottom: 25px; }
     .section-title {
-        font-size: 18px; font-weight: bold; color: #1a365d !important;
+        font-size: 18px; font-weight: bold; color: #12233f !important;
         margin-bottom: 15px; display: flex; align-items: center; gap: 8px;
     }
     /* Estiliza os containers nativos do Streamlit (border=True) como "cards" */
     div[data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #ffffff !important; border-radius: 8px !important;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0 !important;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.06); border: 1px solid #ccd3db !important;
         margin-bottom: 20px;
     }
-    .stTextInput input, .stTextArea textarea { background-color: #ffffff !important; border: 1px solid #cbd5e1 !important; color: #212529 !important; }
-    div[data-testid="stFileUploader"] > section { background-color: #f1f5f9 !important; border: 2px dashed #cbd5e1 !important; border-radius: 8px !important; padding: 20px !important; }
-    div[data-testid="stFileUploader"] button { background-color: #ffffff !important; border: 1px solid #cbd5e1 !important; color: #1e293b !important; font-weight: 500 !important; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05) !important; }
-    div[data-testid="stFileUploader"] label, div[data-testid="stFileUploader"] p, div[data-testid="stFileUploader"] span { color: #475569 !important; }
-    div.stButton > button, div.stDownloadButton > button {
-        background-color: #3b82f6 !important; color: white !important; font-weight: bold !important; font-size: 16px !important;
-        padding: 12px 24px !important; border-radius: 6px !important; border: none !important; width: 100% !important; transition: background-color 0.2s; box-shadow: 0px 2px 4px rgba(59, 130, 246, 0.2);
+    /* Legendas (st.caption) com contraste reforçado, em vez do cinza claro padrão */
+    div[data-testid="stCaptionContainer"], .stApp small {
+        color: #465364 !important; font-weight: 600 !important; letter-spacing: 0.02em;
     }
-    div.stButton > button:hover, div.stDownloadButton > button:hover { background-color: #2563eb !important; }
+    .stTextInput input, .stTextArea textarea {
+        background-color: #ffffff !important; border: 1px solid #99a4b2 !important; color: #14181f !important;
+    }
+    .stTextInput input::placeholder, .stTextArea textarea::placeholder { color: #6b7685 !important; }
+    div[data-testid="stFileUploader"] > section { background-color: #eef1f5 !important; border: 2px dashed #99a4b2 !important; border-radius: 8px !important; padding: 20px !important; }
+    div[data-testid="stFileUploader"] button { background-color: #ffffff !important; border: 1px solid #99a4b2 !important; color: #12233f !important; font-weight: 600 !important; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05) !important; }
+    div[data-testid="stFileUploader"] label, div[data-testid="stFileUploader"] p, div[data-testid="stFileUploader"] span { color: #33404f !important; }
+    div.stButton > button, div.stDownloadButton > button {
+        background-color: #1d4ed8 !important; color: #ffffff !important; font-weight: bold !important; font-size: 16px !important;
+        padding: 12px 24px !important; border-radius: 6px !important; border: none !important; width: 100% !important; transition: background-color 0.15s; box-shadow: 0px 2px 4px rgba(29, 78, 216, 0.25);
+    }
+    div.stButton > button:hover, div.stDownloadButton > button:hover { background-color: #1638a8 !important; }
+    div.stButton > button p, div.stDownloadButton > button p { color: #ffffff !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -142,6 +150,10 @@ if st.session_state.page == "formulario":
     st.markdown('<div class="main-title">Nova Inspeção</div>', unsafe_allow_html=True)
     st.markdown('<div class="subtitle">Anexe a imagem para análise.</div>', unsafe_allow_html=True)
 
+    if st.session_state.get("load_error"):
+        st.error(f"Não foi possível processar a imagem anterior: {st.session_state.load_error}. Tente novamente.")
+        st.session_state.load_error = None
+
     with st.container(border=True):
         st.markdown('<div class="section-title">🖼️ Imagem capturada</div>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader(
@@ -178,56 +190,56 @@ elif st.session_state.page == "loading":
     st.markdown(
         """
         <style>
-        .stApp { background-color: #112233 !important; }
-        .stApp p, .stApp div, .stApp span { color: white !important; }
-        .loading-title { font-size: 32px; font-weight: bold; margin-bottom: 5px; color: white !important; text-align: center; }
-        .loading-subtitle { font-size: 16px; color: #8ba4f9 !important; margin-bottom: 40px; text-align: center; }
-        .loading-text { font-size: 16px; color: #bbb !important; margin-top: 20px; text-align: center; }
+        .stApp { background-color: #0d1b2f !important; }
+        .stApp p, .stApp div, .stApp span { color: #ffffff !important; }
+        .loading-title { font-size: 32px; font-weight: bold; margin-bottom: 5px; color: #ffffff !important; text-align: center; }
+        .loading-subtitle { font-size: 16px; color: #a9c1ff !important; margin-bottom: 40px; text-align: center; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
     st.markdown('<div class="loading-title">VistoPat IA</div>', unsafe_allow_html=True)
-    st.markdown('<div class="loading-subtitle">⚡ Processamento Inteligente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="loading-subtitle">⚡ Analisando a imagem...</div>', unsafe_allow_html=True)
 
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-
-    etapas = [
-        ("Inicializando motores de visão computacional...", 0.2),
-        ("Buscando padrões característicos de Rachadura...", 0.5),
-        ("Analisando anomalias de umidade e Mofo...", 0.8),
-        ("Gerando diagnóstico técnico final...", 1.0),
-    ]
-
-    for texto, progresso in etapas:
-        status_text.markdown(f'<div class="loading-text">{texto}</div>', unsafe_allow_html=True)
-        progress_bar.progress(progresso)
-        time.sleep(0.2)
-
-    # Processamento do modelo
+    # Se a sessão foi perdida (ex: refresh no meio do processo), volta pro
+    # formulário em vez de quebrar com KeyError.
     data = st.session_state.form_data
-    image = Image.open(io.BytesIO(data["file"])).convert("RGB")
-    image.thumbnail((1024, 1024))
-    image_np = np.array(image)
+    if "file" not in data:
+        st.session_state.page = "formulario"
+        st.rerun()
 
-    if model is not None:
-        result = model.predict(source=image_np, imgsz=640, conf=0.40)[0]
-        annotated_img_bgr = result.plot()
-        st.session_state.annotated_img_rgb = annotated_img_bgr[:, :, ::-1]
+    # Sem atrasos artificiais (time.sleep) — só o tempo real de inferência,
+    # mostrado com um spinner nativo do Streamlit.
+    with st.spinner("Processando imagem com o modelo de IA..."):
+        try:
+            image = Image.open(io.BytesIO(data["file"])).convert("RGB")
+            # Redimensiona direto para o tamanho de entrada do modelo (mais rápido
+            # e usa menos memória do que redimensionar para 1024 e deixar o
+            # YOLO redimensionar de novo internamente).
+            image.thumbnail((640, 640))
+            image_np = np.array(image)
 
-        if result.boxes is not None and len(result.boxes) > 0:
-            classes_ids = result.boxes.cls.cpu().numpy().astype(int)
-            class_names = [model.names[cls_id] for cls_id in classes_ids]
-            st.session_state.detections_count = Counter(class_names)
-        else:
-            st.session_state.detections_count = Counter()
-    else:
-        st.session_state.annotated_img_rgb = image_np
-        st.session_state.detections_count = Counter()
+            if model is not None:
+                result = model.predict(source=image_np, imgsz=640, conf=0.40, verbose=False)[0]
+                annotated_img_bgr = result.plot()
+                st.session_state.annotated_img_rgb = annotated_img_bgr[:, :, ::-1]
 
-    st.session_state.page = "resultado"
+                if result.boxes is not None and len(result.boxes) > 0:
+                    classes_ids = result.boxes.cls.cpu().numpy().astype(int)
+                    class_names = [model.names[cls_id] for cls_id in classes_ids]
+                    st.session_state.detections_count = Counter(class_names)
+                else:
+                    st.session_state.detections_count = Counter()
+            else:
+                st.session_state.annotated_img_rgb = image_np
+                st.session_state.detections_count = Counter()
+
+            st.session_state.page = "resultado"
+        except Exception as e:
+            st.session_state.page = "formulario"
+            st.session_state.load_error = str(e)
+
     st.rerun()
 
 # --- TELA 3: RELATÓRIO TÉCNICO ---
@@ -242,6 +254,9 @@ elif st.session_state.page == "resultado":
     st.markdown('<div class="subtitle">Resultados gerados automaticamente com base na análise de IA.</div>', unsafe_allow_html=True)
 
     data = st.session_state.form_data
+    if not data:
+        st.warning("Nenhuma inspeção em andamento. Volte e preencha o formulário.")
+        st.stop()
 
     with st.container(border=True):
         st.markdown('<div class="section-title">🏢 Informações da Estrutura</div>', unsafe_allow_html=True)
@@ -280,12 +295,12 @@ elif st.session_state.page == "resultado":
                     grau = "Leve"
                     rec = "Realizar manutenção preventiva e reparos superficiais de rotina para evitar evolução do quadro."
 
-                cor_grau = "red" if grau == "Crítico" else ("orange" if grau == "Regular" else "green")
+                cor_grau = "#b91c1c" if grau == "Crítico" else ("#b45309" if grau == "Regular" else "#15803d")
 
                 st.markdown(
                     f"""
                     ---
-                    🔴 <span style='font-size:18px; font-weight:bold; color:#1a365d;'>{patologia.upper()}</span>
+                    🔴 <span style='font-size:18px; font-weight:bold; color:#12233f;'>{patologia.upper()}</span>
                     * **Classificação segundo a NBR:** {nbr}
                     * **Grau de Risco/Severidade:** <span style='color:{cor_grau}; font-weight:bold;'>{grau}</span>
                     * **Recomendação para o Engenheiro:** {rec}
@@ -296,7 +311,7 @@ elif st.session_state.page == "resultado":
             st.markdown(
                 """
                 ---
-                🔹 <span style='color:green; font-weight:bold;'>✓ Diagnóstico gerado automaticamente.</span> Verificação física exigida para atestado final do responsável técnico.
+                🔹 <span style='color:#15803d; font-weight:bold;'>✓ Diagnóstico gerado automaticamente.</span> Verificação física exigida para atestado final do responsável técnico.
                 """,
                 unsafe_allow_html=True
             )
