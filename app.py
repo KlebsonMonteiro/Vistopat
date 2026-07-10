@@ -15,6 +15,11 @@ st.set_page_config(
 )
 
 # Injeção de CSS global centralizada
+# Observação: os "cards" agora usam st.container(border=True) em vez de
+# <div> abertas/fechadas em chamadas st.markdown separadas. Isso evita o
+# erro "NotFoundError: Failed to execute 'removeChild' on 'Node'", que
+# acontece quando tags HTML ficam "soltas" entre elementos e o React do
+# Streamlit não consegue reconciliar o DOM ao trocar de página/rerun.
 st.markdown(
     """
     <style>
@@ -29,13 +34,15 @@ st.markdown(
     }
     .main-title { font-size: 28px; font-weight: bold; color: #1a365d !important; margin-bottom: 5px; }
     .subtitle { font-size: 14px; color: #555555 !important; margin-bottom: 25px; }
-    .section-card {
-        background-color: #ffffff !important; padding: 20px; border-radius: 8px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; margin-bottom: 20px;
-    }
     .section-title {
         font-size: 18px; font-weight: bold; color: #1a365d !important;
         margin-bottom: 15px; display: flex; align-items: center; gap: 8px;
+    }
+    /* Estiliza os containers nativos do Streamlit (border=True) como "cards" */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #ffffff !important; border-radius: 8px !important;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0 !important;
+        margin-bottom: 20px;
     }
     .stTextInput input, .stTextArea textarea { background-color: #ffffff !important; border: 1px solid #cbd5e1 !important; color: #212529 !important; }
     div[data-testid="stFileUploader"] > section { background-color: #f1f5f9 !important; border: 2px dashed #cbd5e1 !important; border-radius: 8px !important; padding: 20px !important; }
@@ -51,30 +58,31 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 # Função para gerar o PDF em memória usando ReportLab
 def generate_pdf(data, counts):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     story = []
-    
+
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, leading=28, textColor='#1a365d', spaceAfter=15)
     section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=16, leading=20, textColor='#1a365d', spaceBefore=15, spaceAfter=10)
     text_style = ParagraphStyle('Text', parent=styles['Normal'], fontSize=11, leading=15, spaceAfter=8)
     bold_style = ParagraphStyle('BoldText', parent=text_style, fontName='Helvetica-Bold')
-    
+
     story.append(Paragraph("⚡ VistoPat - Relatório Técnico", title_style))
     story.append(Spacer(1, 15))
-    
+
     story.append(Paragraph("🏢 Informações da Estrutura", section_style))
     story.append(Paragraph(f"<b>Nome do Edifício:</b> {data.get('edificio', '-')}", text_style))
     story.append(Paragraph(f"<b>Bloco / Localização:</b> {data.get('bloco', '-')}", text_style))
     story.append(Paragraph(f"<b>Engenheiro Responsável:</b> {data.get('engenheiro') if data.get('engenheiro') else '-'}", text_style))
     story.append(Paragraph(f"<b>Observações:</b> {data.get('observacoes') if data.get('observacoes') else '-'}", text_style))
     story.append(Spacer(1, 15))
-    
+
     story.append(Paragraph("⚠️ Patologias Identificadas pela IA", section_style))
-    
+
     if len(counts) > 0:
         for patologia, qtd in counts.items():
             if "rachadura" in patologia.lower() or "fissura" in patologia.lower():
@@ -97,10 +105,10 @@ def generate_pdf(data, counts):
             story.append(Spacer(1, 10))
     else:
         story.append(Paragraph("Nenhuma patologia ou anomalia estrutural foi detectada pelo modelo inteligente.", text_style))
-        
+
     story.append(Spacer(1, 15))
     story.append(Paragraph("✓ Diagnóstico gerado automaticamente via inteligência artificial computacional.", text_style))
-    
+
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
@@ -111,10 +119,12 @@ def generate_pdf(data, counts):
 def load_model():
     return YOLO("best.pt")
 
+
 try:
     model = load_model()
-except Exception:
+except Exception as e:
     model = None
+    st.error(f"Erro ao carregar o modelo (best.pt): {e}")
 
 # Inicialização segura dos estados de sessão
 if "page" not in st.session_state:
@@ -128,13 +138,11 @@ if "detections_count" not in st.session_state:
 
 # --- TELA 1: FORMULÁRIO DE INSPEÇÃO ---
 if st.session_state.page == "formulario":
-    # Contêiner isolado para evitar colisões no DOM do React
-    with st.container():
-        st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat </div>', unsafe_allow_html=True)
-        st.markdown('<div class="main-title">Nova Inspeção</div>', unsafe_allow_html=True)
-        st.markdown('<div class="subtitle">Anexe a imagem para análise.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat </div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">Nova Inspeção</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Anexe a imagem para análise.</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    with st.container(border=True):
         st.markdown('<div class="section-title">🖼️ Imagem capturada</div>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader(
             "Clique para selecionar uma imagem da galeria",
@@ -142,31 +150,28 @@ if st.session_state.page == "formulario":
             label_visibility="collapsed",
             key="uploader_input"
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    with st.container(border=True):
         st.markdown('<div class="section-title">🏢 Informações da Estrutura</div>', unsafe_allow_html=True)
 
         nome_edificio = st.text_input("Nome do Edifício *", placeholder="Ex: Residencial Alphaville", key="f_edificio")
         bloco_localizacao = st.text_input("Bloco / Localização *", placeholder="Ex: Bloco B - Fachada Leste", key="f_bloco")
         nome_engenheiro = st.text_input("Nome do Engenheiro *", placeholder="Ex: Eng. Roberto Carlos", key="f_eng")
         observacoes = st.text_area("Observações", placeholder="Detalhes adicionais sobre a vistoria...", key="f_obs")
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        if st.button("Executar Análise Inteligente", key="btn_analisar"):
-            if not uploaded_file or not nome_edificio or not bloco_localizacao:
-                st.error("Por favor, preencha os campos obrigatórios (*) e carregue uma imagem.")
-            else:
-                st.session_state.form_data = {
-                    "edificio": nome_edificio,
-                    "bloco": bloco_localizacao,
-                    "engenheiro": nome_engenheiro,
-                    "observacoes": observacoes,
-                    "file": uploaded_file.read(),
-                }
-                st.session_state.page = "loading"
-                st.original_rerun = st.rerun if hasattr(st, "rerun") else st.experimental_rerun
-                st.original_rerun()
+    if st.button("Executar Análise Inteligente", key="btn_analisar"):
+        if not uploaded_file or not nome_edificio or not bloco_localizacao:
+            st.error("Por favor, preencha os campos obrigatórios (*) e carregue uma imagem.")
+        else:
+            st.session_state.form_data = {
+                "edificio": nome_edificio,
+                "bloco": bloco_localizacao,
+                "engenheiro": nome_engenheiro,
+                "observacoes": observacoes,
+                "file": uploaded_file.read(),
+            }
+            st.session_state.page = "loading"
+            st.rerun()
 
 # --- TELA 2: ANIMAÇÃO DE CARREGAMENTO E PROCESSAMENTO ---
 elif st.session_state.page == "loading":
@@ -175,79 +180,70 @@ elif st.session_state.page == "loading":
         <style>
         .stApp { background-color: #112233 !important; }
         .stApp p, .stApp div, .stApp span { color: white !important; }
-        .loading-box { text-align: center; padding-top: 10%; }
-        .loading-title { font-size: 32px; font-weight: bold; margin-bottom: 5px; color: white !important; }
-        .loading-subtitle { font-size: 16px; color: #8ba4f9 !important; margin-bottom: 40px; }
-        .loading-text { font-size: 16px; color: #bbb !important; margin-top: 20px; }
+        .loading-title { font-size: 32px; font-weight: bold; margin-bottom: 5px; color: white !important; text-align: center; }
+        .loading-subtitle { font-size: 16px; color: #8ba4f9 !important; margin-bottom: 40px; text-align: center; }
+        .loading-text { font-size: 16px; color: #bbb !important; margin-top: 20px; text-align: center; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # Contêiner limpo para o ciclo de carregamento
-    with st.container():
-        st.markdown('<div class="loading-box">', unsafe_allow_html=True)
-        st.markdown('<div class="loading-title">VistoPat IA</div>', unsafe_allow_html=True)
-        st.markdown('<div class="loading-subtitle">⚡ Processamento Inteligente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="loading-title">VistoPat IA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="loading-subtitle">⚡ Processamento Inteligente</div>', unsafe_allow_html=True)
 
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+    progress_bar = st.progress(0)
+    status_text = st.empty()
 
-        etapas = [
-            ("Inicializando motores de visão computacional...", 0.2),
-            ("Buscando padrões característicos de Rachadura...", 0.5),
-            ("Analisando anomalias de umidade e Mofo...", 0.8),
-            ("Gerando diagnóstico técnico final...", 1.0),
-        ]
+    etapas = [
+        ("Inicializando motores de visão computacional...", 0.2),
+        ("Buscando padrões característicos de Rachadura...", 0.5),
+        ("Analisando anomalias de umidade e Mofo...", 0.8),
+        ("Gerando diagnóstico técnico final...", 1.0),
+    ]
 
-        for texto, progresso in etapas:
-            status_text.markdown(f'<div class="loading-text">{texto}</div>', unsafe_allow_html=True)
-            progress_bar.progress(progresso)
-            time.sleep(0.2)
+    for texto, progresso in etapas:
+        status_text.markdown(f'<div class="loading-text">{texto}</div>', unsafe_allow_html=True)
+        progress_bar.progress(progresso)
+        time.sleep(0.2)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Processamento do modelo
+    data = st.session_state.form_data
+    image = Image.open(io.BytesIO(data["file"])).convert("RGB")
+    image.thumbnail((1024, 1024))
+    image_np = np.array(image)
 
-        # Processamento seguro fora de elementos flutuantes do DOM
-        data = st.session_state.form_data
-        image = Image.open(io.BytesIO(data["file"])).convert("RGB")
-        image.thumbnail((1024, 1024)) 
-        image_np = np.array(image)
+    if model is not None:
+        result = model.predict(source=image_np, imgsz=640, conf=0.40)[0]
+        annotated_img_bgr = result.plot()
+        st.session_state.annotated_img_rgb = annotated_img_bgr[:, :, ::-1]
 
-        if model is not None:
-            result = model.predict(source=image_np, imgsz=640, conf=0.40)[0]
-            annotated_img_bgr = result.plot()
-            st.session_state.annotated_img_rgb = annotated_img_bgr[:, :, ::-1]
-
-            if result.boxes is not None and len(result.boxes) > 0:
-                classes_ids = result.boxes.cls.cpu().numpy().astype(int)
-                class_names = [model.names[cls_id] for cls_id in classes_ids]
-                st.session_state.detections_count = Counter(class_names)
-            else:
-                st.session_state.detections_count = Counter()
+        if result.boxes is not None and len(result.boxes) > 0:
+            classes_ids = result.boxes.cls.cpu().numpy().astype(int)
+            class_names = [model.names[cls_id] for cls_id in classes_ids]
+            st.session_state.detections_count = Counter(class_names)
         else:
-            st.session_state.annotated_img_rgb = image_np
             st.session_state.detections_count = Counter()
+    else:
+        st.session_state.annotated_img_rgb = image_np
+        st.session_state.detections_count = Counter()
 
-        st.session_state.page = "resultado"
-        st.original_rerun = st.rerun if hasattr(st, "rerun") else st.experimental_rerun
-        st.original_rerun()
+    st.session_state.page = "resultado"
+    st.rerun()
 
 # --- TELA 3: RELATÓRIO TÉCNICO ---
 elif st.session_state.page == "resultado":
-    with st.container():
-        st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat IA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-header" style="color: white !important;">⚡ VistoPat IA</div>', unsafe_allow_html=True)
 
-        if st.button("⬅️ Voltar para Nova Inspeção", key="btn_voltar"):
-            st.session_state.page = "formulario"
-            st.original_rerun = st.rerun if hasattr(st, "rerun") else st.experimental_rerun
-            st.original_rerun()
+    if st.button("⬅️ Voltar para Nova Inspeção", key="btn_voltar"):
+        st.session_state.page = "formulario"
+        st.rerun()
 
-        st.markdown('<div class="main-title">📋 Relatório Técnico</div>', unsafe_allow_html=True)
-        st.markdown('<div class="subtitle">Resultados gerados automaticamente com base na análise de IA.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">📋 Relatório Técnico</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Resultados gerados automaticamente com base na análise de IA.</div>', unsafe_allow_html=True)
 
-        data = st.session_state.form_data
+    data = st.session_state.form_data
 
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    with st.container(border=True):
         st.markdown('<div class="section-title">🏢 Informações da Estrutura</div>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         with col1:
@@ -260,9 +256,8 @@ elif st.session_state.page == "resultado":
             st.markdown(f"**{data.get('bloco', '-')}**")
             st.caption("OBSERVAÇÕES")
             st.markdown(f"*{data.get('observacoes') if data.get('observacoes') else '-'}*")
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    with st.container(border=True):
         st.markdown('<div class="section-title">⚠️ Resumo das Patologias Identificadas</div>', unsafe_allow_html=True)
 
         if st.session_state.annotated_img_rgb is not None:
@@ -286,7 +281,7 @@ elif st.session_state.page == "resultado":
                     rec = "Realizar manutenção preventiva e reparos superficiais de rotina para evitar evolução do quadro."
 
                 cor_grau = "red" if grau == "Crítico" else ("orange" if grau == "Regular" else "green")
-                
+
                 st.markdown(
                     f"""
                     ---
@@ -297,25 +292,23 @@ elif st.session_state.page == "resultado":
                     """,
                     unsafe_allow_html=True,
                 )
-                
+
             st.markdown(
                 """
                 ---
                 🔹 <span style='color:green; font-weight:bold;'>✓ Diagnóstico gerado automaticamente.</span> Verificação física exigida para atestado final do responsável técnico.
-                """, 
+                """,
                 unsafe_allow_html=True
             )
         else:
             st.success("Análise concluída com sucesso: Nenhuma anomalia ou patologia crítica detectada na estrutura.")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        pdf_data = generate_pdf(data, counts)
-        
-        st.download_button(
-            label="📥 Exportar Relatório em PDF",
-            data=pdf_data,
-            file_name=f"Relatorio_{data.get('edificio', 'inspecao').replace(' ', '_')}.pdf",
-            mime="application/pdf",
-            key="btn_download_pdf"
-        )
+    pdf_data = generate_pdf(data, counts)
+
+    st.download_button(
+        label="📥 Exportar Relatório em PDF",
+        data=pdf_data,
+        file_name=f"Relatorio_{data.get('edificio', 'inspecao').replace(' ', '_')}.pdf",
+        mime="application/pdf",
+        key="btn_download_pdf"
+    )
